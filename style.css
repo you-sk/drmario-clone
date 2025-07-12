@@ -119,3 +119,48 @@ body {
 .game-over-content button:hover {
     background-color: #cc0000;
 }
+
+.pause-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.pause-overlay.hidden {
+    display: none;
+}
+
+.pause-content {
+    background-color: #000066;
+    padding: 40px;
+    border-radius: 15px;
+    text-align: center;
+    border: 3px solid #ffffff;
+    animation: pulse 2s infinite;
+}
+
+.pause-content h2 {
+    margin-top: 0;
+    color: #ffff00;
+    font-size: 32px;
+    margin-bottom: 15px;
+}
+
+.pause-content p {
+    color: white;
+    font-size: 18px;
+    margin: 0;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}

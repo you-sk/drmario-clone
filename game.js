@@ -32,7 +32,16 @@ class DrMarioGame {
         this.virusCount = 0;
         this.dropTimer = 0;
         this.dropInterval = 600; // milliseconds
+        this.fastDropTimer = 0;
+        this.fastDropInterval = 50; // Fast drop every 50ms
         this.lastTime = 0;
+        
+        // Key state tracking
+        this.keys = {
+            down: false,
+            left: false,
+            right: false
+        };
         
         this.initializeBoard();
         this.setupEventListeners();
@@ -45,12 +54,16 @@ class DrMarioGame {
     
     initializeBoard() {
         this.board = [];
+        this.pillConnections = []; // Track pill connections
         for (let y = 0; y < this.BOARD_HEIGHT; y++) {
             this.board[y] = [];
+            this.pillConnections[y] = [];
             for (let x = 0; x < this.BOARD_WIDTH; x++) {
                 this.board[y][x] = { color: this.COLORS.EMPTY, isVirus: false };
+                this.pillConnections[y][x] = null; // null means no connection, or connection ID
             }
         }
+        this.nextConnectionId = 1; // Counter for unique connection IDs
     }
     
     generateViruses() {
@@ -202,14 +215,20 @@ class DrMarioGame {
         if (!this.currentPill) return;
         
         const positions = this.getPillPositions(this.currentPill);
+        const connectionId = this.nextConnectionId++;
+        
+        // Place both halves with the same connection ID
         this.board[positions[0].y][positions[0].x] = {
             color: this.currentPill.color1,
             isVirus: false
         };
+        this.pillConnections[positions[0].y][positions[0].x] = connectionId;
+        
         this.board[positions[1].y][positions[1].x] = {
             color: this.currentPill.color2,
             isVirus: false
         };
+        this.pillConnections[positions[1].y][positions[1].x] = connectionId;
         
         this.currentPill = null;
     }
@@ -265,16 +284,28 @@ class DrMarioGame {
             }
         }
         
-        // Remove matched pieces
+        // Remove matched pieces and handle pill separation
         if (toRemove.size > 0) {
             let virusesRemoved = 0;
+            const affectedConnections = new Set();
+            
             toRemove.forEach(pos => {
                 const [x, y] = pos.split(',').map(Number);
                 if (this.board[y][x].isVirus) {
                     virusesRemoved++;
                 }
+                
+                // Track affected pill connections
+                if (this.pillConnections[y][x] !== null) {
+                    affectedConnections.add(this.pillConnections[y][x]);
+                }
+                
                 this.board[y][x] = { color: this.COLORS.EMPTY, isVirus: false };
+                this.pillConnections[y][x] = null;
             });
+            
+            // Break connections for affected pills
+            this.breakPillConnections(affectedConnections);
             
             this.virusCount -= virusesRemoved;
             this.score += toRemove.size * 100;
@@ -293,6 +324,59 @@ class DrMarioGame {
         }
     }
     
+    breakPillConnections(affectedConnections) {
+        // For each affected connection, check if both pieces still exist
+        affectedConnections.forEach(connectionId => {
+            const connectedPieces = [];
+            
+            // Find all pieces with this connection ID
+            for (let y = 0; y < this.BOARD_HEIGHT; y++) {
+                for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                    if (this.pillConnections[y][x] === connectionId) {
+                        connectedPieces.push({ x, y });
+                    }
+                }
+            }
+            
+            // If only one piece remains, it's now disconnected
+            if (connectedPieces.length === 1) {
+                const piece = connectedPieces[0];
+                this.pillConnections[piece.y][piece.x] = null;
+            }
+        });
+    }
+    
+    canPieceMove(x, y) {
+        // Check if a piece can move (not connected or connection allows movement)
+        if (this.pillConnections[y][x] === null) {
+            return true; // Disconnected piece can move
+        }
+        
+        const connectionId = this.pillConnections[y][x];
+        const connectedPieces = [];
+        
+        // Find connected piece
+        for (let cy = 0; cy < this.BOARD_HEIGHT; cy++) {
+            for (let cx = 0; cx < this.BOARD_WIDTH; cx++) {
+                if (this.pillConnections[cy][cx] === connectionId) {
+                    connectedPieces.push({ x: cx, y: cy });
+                }
+            }
+        }
+        
+        // If connected piece exists, check if both can move
+        if (connectedPieces.length === 2) {
+            const otherPiece = connectedPieces.find(p => p.x !== x || p.y !== y);
+            if (otherPiece) {
+                // Both pieces must be able to move down
+                return (otherPiece.y + 1 < this.BOARD_HEIGHT && 
+                        this.board[otherPiece.y + 1][otherPiece.x].color === this.COLORS.EMPTY);
+            }
+        }
+        
+        return true; // Single piece can move
+    }
+    
     applyGravity() {
         let moved = false;
         
@@ -301,10 +385,34 @@ class DrMarioGame {
             for (let y = this.BOARD_HEIGHT - 2; y >= 0; y--) {
                 if (this.board[y][x].color !== this.COLORS.EMPTY && 
                     !this.board[y][x].isVirus && // Only move pills, not viruses
-                    this.board[y + 1][x].color === this.COLORS.EMPTY) {
-                    // Move pill down one step
+                    this.board[y + 1][x].color === this.COLORS.EMPTY &&
+                    this.canPieceMove(x, y)) { // Check if piece can move considering connections
+                    
+                    const connectionId = this.pillConnections[y][x];
+                    
+                    // Move the piece
                     this.board[y + 1][x] = this.board[y][x];
                     this.board[y][x] = { color: this.COLORS.EMPTY, isVirus: false };
+                    this.pillConnections[y + 1][x] = connectionId;
+                    this.pillConnections[y][x] = null;
+                    
+                    // If connected, move the connected piece too
+                    if (connectionId !== null) {
+                        for (let cy = 0; cy < this.BOARD_HEIGHT; cy++) {
+                            for (let cx = 0; cx < this.BOARD_WIDTH; cx++) {
+                                if (this.pillConnections[cy][cx] === connectionId && (cx !== x || cy !== y + 1)) {
+                                    if (cy + 1 < this.BOARD_HEIGHT && this.board[cy + 1][cx].color === this.COLORS.EMPTY) {
+                                        this.board[cy + 1][cx] = this.board[cy][cx];
+                                        this.board[cy][cx] = { color: this.COLORS.EMPTY, isVirus: false };
+                                        this.pillConnections[cy + 1][cx] = connectionId;
+                                        this.pillConnections[cy][cx] = null;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
                     moved = true;
                 }
             }
@@ -340,6 +448,12 @@ class DrMarioGame {
         this.level = 1;
         this.score = 0;
         this.dropInterval = 600;
+        this.dropTimer = 0;
+        this.fastDropTimer = 0;
+        this.currentPill = null;
+        this.nextConnectionId = 1;
+        // Reset key states
+        this.keys = { down: false, left: false, right: false };
         this.initializeBoard();
         this.generateViruses();
         this.generateNextPill();
@@ -348,25 +462,52 @@ class DrMarioGame {
         this.gamePaused = false;
         this.updateLevel();
         this.updateScore();
+        this.updateVirusCount();
         document.getElementById('game-over').classList.add('hidden');
+        
+        // Restart the game loop
+        this.gameLoop();
     }
     
     togglePause() {
         this.gamePaused = !this.gamePaused;
+        
+        const pauseOverlay = document.getElementById('pause-overlay');
+        if (this.gamePaused) {
+            pauseOverlay.classList.remove('hidden');
+        } else {
+            pauseOverlay.classList.add('hidden');
+        }
     }
     
     setupEventListeners() {
         document.addEventListener('keydown', (e) => {
             if (!this.gameRunning) return;
             
+            // Always allow space key for pause/unpause
+            if (e.code === 'Space') {
+                e.preventDefault();
+                this.togglePause();
+                return;
+            }
+            
+            // Block all other inputs when paused
+            if (this.gamePaused) return;
+            
             switch(e.code) {
                 case 'ArrowLeft':
                     e.preventDefault();
-                    this.movePill(-1, 0);
+                    if (!this.keys.left) {
+                        this.movePill(-1, 0);
+                        this.keys.left = true;
+                    }
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    this.movePill(1, 0);
+                    if (!this.keys.right) {
+                        this.movePill(1, 0);
+                        this.keys.right = true;
+                    }
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
@@ -374,11 +515,24 @@ class DrMarioGame {
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
-                    this.dropPill();
+                    if (!this.keys.down) {
+                        this.keys.down = true;
+                        this.fastDropTimer = 0; // Reset timer for immediate drop
+                    }
                     break;
-                case 'Space':
-                    e.preventDefault();
-                    this.togglePause();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'ArrowLeft':
+                    this.keys.left = false;
+                    break;
+                case 'ArrowRight':
+                    this.keys.right = false;
+                    break;
+                case 'ArrowDown':
+                    this.keys.down = false;
                     break;
             }
         });
@@ -387,10 +541,20 @@ class DrMarioGame {
     update(deltaTime) {
         if (!this.gameRunning || this.gamePaused) return;
         
-        this.dropTimer += deltaTime;
-        if (this.dropTimer >= this.dropInterval) {
-            this.dropPill();
-            this.dropTimer = 0;
+        // Handle fast drop when down key is held
+        if (this.keys.down) {
+            this.fastDropTimer += deltaTime;
+            if (this.fastDropTimer >= this.fastDropInterval) {
+                this.dropPill();
+                this.fastDropTimer = 0;
+            }
+        } else {
+            // Normal drop timing
+            this.dropTimer += deltaTime;
+            if (this.dropTimer >= this.dropInterval) {
+                this.dropPill();
+                this.dropTimer = 0;
+            }
         }
     }
     
