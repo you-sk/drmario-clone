@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dr. Mario Clone</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-info">
+            <h1>Dr. Mario Clone</h1>
+            <div class="score-board">
+                <div>Level: <span id="level">1</span></div>
+                <div>Viruses: <span id="virus-count">0</span></div>
+                <div>Score: <span id="score">0</span></div>
+            </div>
+            <div class="controls">
+                <p>Controls:</p>
+                <p>← → : Move</p>
+                <p>↑ : Rotate</p>
+                <p>↓ : Fast Drop</p>
+                <p>Space: Pause</p>
+            </div>
+        </div>
+        <div class="game-board">
+            <canvas id="gameCanvas" width="320" height="640"></canvas>
+        </div>
+        <div class="next-pill">
+            <h3>Next Pill</h3>
+            <canvas id="nextCanvas" width="80" height="40"></canvas>
+        </div>
+    </div>
+    <div id="game-over" class="game-over hidden">
+        <div class="game-over-content">
+            <h2 id="game-over-message">Game Over</h2>
+            <button onclick="game.restart()">Restart</button>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
