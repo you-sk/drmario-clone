@@ -2,6 +2,10 @@
 
 任天堂の名作パズルゲーム「Dr. Mario」のクローンゲームです。ブラウザで動作するHTML5/JavaScript実装です。
 
+<img width="685" height="719" alt="image" src="https://github.com/user-attachments/assets/716880c1-7318-4e39-a391-f31d31696f19" />
+
+https://you-sk.github.io/drmario-clone/
+
 ## ゲーム概要
 
 Dr. Marioは落ち物パズルゲームの一種で、プレイヤーは2色のピルを操作してボード上のウイルスを全て消去することを目指します。同じ色のピースを4個以上縦または横に並べると消去されます。
