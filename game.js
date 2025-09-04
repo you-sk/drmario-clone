@@ -76,6 +76,34 @@ class DrMarioGame {
         const startY = Math.floor(this.BOARD_HEIGHT / 2);
         let placed = 0;
         
+        // Ensure at least one virus of each color exists (if we have at least 3 viruses)
+        if (numViruses >= 3) {
+            const guaranteedPositions = [];
+            
+            // Find 3 random empty positions for the guaranteed colors
+            while (guaranteedPositions.length < 3) {
+                const x = Math.floor(Math.random() * this.BOARD_WIDTH);
+                const y = startY + Math.floor(Math.random() * (this.BOARD_HEIGHT - startY));
+                
+                if (this.board[y][x].color === this.COLORS.EMPTY && 
+                    !guaranteedPositions.some(pos => pos.x === x && pos.y === y)) {
+                    guaranteedPositions.push({x, y});
+                }
+            }
+            
+            // Place one virus of each color
+            for (let i = 0; i < 3; i++) {
+                const pos = guaranteedPositions[i];
+                this.board[pos.y][pos.x] = {
+                    color: virusColors[i],
+                    isVirus: true
+                };
+                placed++;
+                this.virusCount++;
+            }
+        }
+        
+        // Place remaining viruses randomly
         while (placed < numViruses) {
             const x = Math.floor(Math.random() * this.BOARD_WIDTH);
             const y = startY + Math.floor(Math.random() * (this.BOARD_HEIGHT - startY));
